@@ -1,0 +1,140 @@
+---
+title: "marketreview"
+author: "cb"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=FALSE,message=FALSE)
+```
+
+## Les outils
+
+[Source scimago Institution Ranking](https://www.scimagojr.com/journalrank.php?category=1406)
+
+```{r 00}
+library(tidyverse)
+library(readr)
+library(ggcorrplot)
+library(FactoMineR)
+library(factoextra)
+library(ggrepel)
+library(viridis)
+theme_set(theme_minimal())
+
+df <- read_delim("scimagojr 2021  Subject Category - Marketing 2.csv", 
+    delim = ";", escape_double = FALSE, trim_ws = TRUE)
+
+```
+
+## Corrélations
+
+Manifestement deux éléments : la production et les citations de ces productions.
+
+```{r 01}
+cor<-df %>% column_to_rownames("Title") %>% select(5,7:14)%>% 
+   drop_na()
+r<-cor(cor)
+
+ggcorrplot(r, hc.order = TRUE, type = "lower",
+   outline.col = "white",
+   colors = c("#6D9EC1", "white", "#E46726"))
+ggsave("journal00.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
+
+```
+
+
+## Une petite ACP
+
+On confirme avec l'ACP. On note que le nombre de références par article est moins bien représenté, mais participe au facteur de production.
+
+
+```{r 02}
+
+res.pca <- PCA(cor, graph = FALSE)
+
+fviz_pca_var(res.pca)
+ggsave("journal01.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
+
+```
+
+
+## Le tableau final
+
+remarques :
+
+*  Deux anomalies, une revue plutôt IS mais qui publient certainement des papiers à applications marketing, et Journal of Business Research, dont la production annuelles écrasent ses concurrents, son score de citation est certainement lié à cette stratégie d'acceptation élargie. (Il manque d'ailleurs à ces indicateurs, un indicateur de taux d'acceptation...)
+
+* Une corrélation générale plutôt positive entre production et citations, plus on produit et mieux on est cité , du point de vue des revues.
+
+* L'hégémonie UK-USA, mais les pays bas qui tirent leur épingle du jeu.
+
+[Une carte plus grande et de meilleure définition](journal02.jpg)
+
+```{r 03}
+
+df$pays<-fct_lump_min(df$Country, min =5) %>% as.character()
+df$ram[df$Issn=="20515707"]<-"Rech. et Appl. en Mark."
+df$ram[df$Issn!="20515707"]<-"Autres"
+
+
+df<-df %>%filter(`Cites / Doc. (2years)`>0.1)
+
+
+ggplot(df, aes(x=`Total Docs. (3years)`/3, y=`Cites / Doc. (2years)`/2))+
+   geom_smooth(color="grey", fill="Grey90")+
+   geom_point(aes(color= pays, size=`H index`,shape=ram))+
+   geom_text_repel(size=1.2, max.overlaps=40,segment.color="grey",
+                   segment.shape	=0.1,aes(label=str_wrap(Title, 25)))+
+   scale_x_continuous(trans="log10")+
+   scale_y_continuous(limits=c(0.1,20),trans="log10")+
+   labs(title="Performances des revues académiques de marketing",
+        x= "Nombre moyen d'articles publiés par an (sur les 3 dernières années)",
+        y= "Nombre moyen de citations par article et par an (sur deux ans)")+
+   guides(shape="none")+scale_colour_viridis_d()
+
+
+ggsave("journal02.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
+
+
+```
+
+## Des suppléments
+
+Les pays et leur performances, on s'interrogera sur le cas français en le comparant au cas allemand.
+
+Et finalement, le nombre de citations dans un article qui semble plutôt homogène.(de l'ordre de 70)
+
+
+```{r pressure, echo=FALSE}
+t<-as.data.frame(table(df$Country))
+ggplot(t,aes(x=reorder(Var1,Freq), y=Freq))+
+   geom_bar(stat = "identity")+
+   coord_flip()
+
+ggplot(df,aes(x=Country, y=SJR))+
+   geom_boxplot()+
+   coord_flip()+
+   scale_y_log10()
+
+ggplot(df,aes(x=`Ref. / Doc.`))+
+   geom_histogram()
+
+ggplot(df, aes(x=`Total Docs. (3years)`/3, y=`Cites / Doc. (2years)`/2))+
+   geom_smooth(color="grey", fill="Grey90")+
+   geom_point(aes(color= pays, size=`Ref. / Doc.`,shape=ram))+
+   geom_text_repel(size=1.2, max.overlaps=40,segment.color="grey",
+                   segment.shape	=0.1,aes(label=str_wrap(Title, 25)))+
+   scale_x_continuous(trans="log10")+
+   scale_y_continuous(limits=c(0.1,20),trans="log10")+
+   labs(title="Performances des revues académiques de marketing",
+        x= "Nombre moyen d'articles publiés par an (sur les 3 dernières années)",
+        y= "Nombre moyen de citations par article et par an (sur deux ans)")+
+   guides(shape="none")+scale_colour_viridis_d()
+
+
+ggsave("journal03.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
+
+```
+
