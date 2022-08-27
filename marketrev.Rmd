@@ -1,5 +1,5 @@
 ---
-title: "marketreview"
+title: "Les 200 principales revues de Marketing"
 author: "cb"
 date: "`r Sys.Date()`"
 output: html_document
