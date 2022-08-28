@@ -138,3 +138,66 @@ ggsave("journal03.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
 
 ```
 
+## Un regard par les éditeurs
+
+Finalement peu de concentration. La catégorie other représente les éditeurs qui ne publient qu'une seule revue.
+
+Un peu de retraitement est nécessaire : certains éditeurs ont un pied au US et un autre en UK ou au Pays-Bas ( Elsevier). On note que l'AMA est son propre éditeur, que les historiques éditeurs universitaires tiennent une bonne position.
+
+```{r 06, echo=FALSE}
+df$Publisher1<-str_replace(df$Publisher, pattern = "Ltd.", "")
+df$Publisher1<-str_replace(df$Publisher1, pattern = "Ltd", "")
+df$Publisher1<-str_replace(df$Publisher1, pattern = "Inc.", "")
+df$Publisher1<-str_replace(df$Publisher1, pattern = "BV", "")
+
+df$Publisher1<- str_trim(df$Publisher1, side ="right")
+
+o<-nrow(df)
+
+t<- as.data.frame(table(df$Publisher1))%>%
+   arrange(desc(Freq))%>%
+   mutate(cum=cumsum(Freq))
+
+
+
+ggplot(t, aes(x=reorder(Var1,-cum),y=cum))+
+   geom_bar(stat="identity", aes(fill=log(Freq)))+
+   coord_flip()+labs(x=NULL, y="Nombre cumulé de revues")+ theme(legend.position = "none")
+
+#double jeopardy
+
+total<-sum(df$`Total Docs. (3years)`)
+
+
+foo<- df %>% group_by(Publisher1)%>%
+   summarise(doc=sum(`Total Docs. (3years)`)/total,
+             citations=mean(`Cites / Doc. (2years)`),
+             sd= max(`Cites / Doc. (2years)`)-min(`Cites / Doc. (2years)`)+.1)
+m<-nrow(foo)
+library(scales)
+ggplot(foo, aes(x=doc,y=citations, size=doc))+
+   geom_point(color="Orange",aes(alpha=-sd))+
+       scale_size(range = c(.1, 20), name="Variance")+
+   geom_text_repel(aes(label=Publisher1), max.overlaps = 15, size=2)+
+   labs(title="Double jeopardy : le marché des revues de marketing",
+        subtitle = paste0("Nombre total d'articles (3 ans) : ", total, " - Nombre d'éditeurs : ", m, " - Nombre de revues : ", o),
+   x="Part de production : nb d'articles publiés par l'éditeur / Total ( en log10)", 
+   y="Nombre moyen de citations par an et par article",
+   caption = "Les cercles représentent la part de production, la teinte est plus claire quand la variance des citations/article est forte")+ 
+   theme(legend.position = "none")+
+scale_x_continuous(labels = percent, trans = "log10")+   geom_smooth(method="lm",span = 0.8,se = FALSE)+
+   ylim(0,10)
+
+
+ggsave("journal05.jpg", plot=last_plot(),width = 28, height = 19, units = "cm")
+
+
+
+df$Publisher2<-fct_lump_min(df$Publisher1, min =2) %>% as.character()
+
+foo<- df %>% group_by(Publisher2)%>%
+   summarise(doc=sum(`Total Docs. (3years)`)/total,
+             citations=mean(`Cites / Doc. (2years)`),
+             sd=max(`Cites / Doc. (2years)`)-min(`Cites / Doc. (2years)`)+.1)
+
+```
